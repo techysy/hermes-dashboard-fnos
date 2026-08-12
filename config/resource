@@ -1,0 +1,15 @@
+{
+    "data-share":
+    {
+        "shares":
+        [
+            {
+                "name": "HermesDashboard",
+                "permission":
+                {
+                    "rw": ["HermesDashboard"]
+                }
+            }
+        ]
+    }
+}

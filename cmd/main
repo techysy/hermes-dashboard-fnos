@@ -1,0 +1,30 @@
+#!/bin/bash
+# Hermes Dashboard — 空壳应用（无后端进程）
+# 仅作为 Hermes Core dashboard (:9119) 的桌面快捷入口, iframe 直接指向该端口。
+set -u
+
+case "${1:-start}" in
+    start)
+        echo "started"
+        ;;
+    stop)
+        echo "stopped"
+        ;;
+    status)
+        # 检查 Hermes Core dashboard 是否存活 (端口 9119)
+        if curl -sf -m3 http://127.0.0.1:9119/ >/dev/null 2>&1; then
+            echo "running"
+        else
+            echo "dashboard :9119 unreachable (Hermes Core 未运行?)"
+            echo "running"   # 空壳自身始终视为 running, 避免 App Center 反复重启
+        fi
+        ;;
+    restart)
+        echo "restarted"
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|status|restart}"
+        exit 1
+        ;;
+esac
+exit 0
