@@ -1,30 +1,75 @@
 #!/bin/bash
-# Hermes Dashboard — 空壳应用（无后端进程）
-# 仅作为 Hermes Core dashboard (:9119) 的桌面快捷入口, iframe 直接指向该端口。
+# Hermes Dashboard — 空壳应用
+# 提供反向代理: 0.0.0.0:9118 -> 本机 Hermes Core dashboard (127.0.0.1:9119)
+# dashboard 绑定 loopback 免认证, 本代理让局域网免登录访问。
 set -u
 
+APP_NAME="${TRIM_APPNAME:-HermesDashboard}"
+DATA_DIR="${TRIM_PKGVAR:-/vol4/@appdata/${APP_NAME}}"
+APP_DIR="${TRIM_APPDEST:-/var/apps/${APP_NAME}}"
+LOG="${DATA_DIR}/proxy.log"
+PID_FILE="${DATA_DIR}/proxy.pid"
+PROXY_PORT=9118
+UPSTREAM_HOST=127.0.0.1
+UPSTREAM_PORT=9119
+
+# 定位 proxy.py (与 cmd/main 同目录, 兼容各种 TRIM_APPDEST)
+CMD_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROXY_SRC="${CMD_DIR}/proxy.py"
+[ -f "${APP_DIR}/cmd/proxy.py" ] && PROXY_SRC="${APP_DIR}/cmd/proxy.py"
+[ -f "${APP_DIR}/target/cmd/proxy.py" ] && PROXY_SRC="${APP_DIR}/target/cmd/proxy.py"
+
+mkdir -p "${DATA_DIR}"
+
+log() { echo "[$(date '+%F %T')] $*" >> "${LOG}"; }
+
+start() {
+    # 启动反向代理 (Python 标准库)
+    if [ -f "${PID_FILE}" ] && kill -0 "$(cat "${PID_FILE}")" 2>/dev/null; then
+        log "proxy already running (pid $(cat "${PID_FILE}"))"
+        return 0
+    fi
+    PY=/usr/bin/python3
+    [ -x /vol4/@appcenter/python312/bin/python3.12 ] && PY=/vol4/@appcenter/python312/bin/python3.12
+    nohup "${PY}" "${PROXY_SRC}" "${PROXY_PORT}" "${UPSTREAM_HOST}" "${UPSTREAM_PORT}" >> "${LOG}" 2>&1 &
+    echo $! > "${PID_FILE}"
+    log "proxy started (pid $(cat "${PID_FILE}")) :${PROXY_PORT} -> ${UPSTREAM_HOST}:${UPSTREAM_PORT}"
+    sleep 1
+    return 0
+}
+
+stop() {
+    if [ -f "${PID_FILE}" ]; then
+        PID=$(cat "${PID_FILE}")
+        kill "${PID}" 2>/dev/null || true
+        sleep 1
+        kill -9 "${PID}" 2>/dev/null || true
+        rm -f "${PID_FILE}"
+        log "proxy stopped (pid ${PID})"
+    fi
+    pkill -f "proxy.py" 2>/dev/null || true
+    return 0
+}
+
+status() {
+    if [ -f "${PID_FILE}" ] && kill -0 "$(cat "${PID_FILE}")" 2>/dev/null; then
+        echo "running (pid $(cat "${PID_FILE}"))"
+        return 0
+    fi
+    if curl -sf -m3 "http://127.0.0.1:${PROXY_PORT}/" >/dev/null 2>&1; then
+        echo "running (port ${PROXY_PORT})"
+        return 0
+    fi
+    # 上游 dashboard 未运行时不视为空壳错误 (空壳自身始终 running)
+    echo "running"
+    return 0
+}
+
 case "${1:-start}" in
-    start)
-        echo "started"
-        ;;
-    stop)
-        echo "stopped"
-        ;;
-    status)
-        # 检查 Hermes Core dashboard 是否存活 (端口 9119)
-        if curl -sf -m3 http://127.0.0.1:9119/ >/dev/null 2>&1; then
-            echo "running"
-        else
-            echo "dashboard :9119 unreachable (Hermes Core 未运行?)"
-            echo "running"   # 空壳自身始终视为 running, 避免 App Center 反复重启
-        fi
-        ;;
-    restart)
-        echo "restarted"
-        ;;
-    *)
-        echo "Usage: $0 {start|stop|status|restart}"
-        exit 1
-        ;;
+    start) start ;;
+    stop) stop ;;
+    status) status ;;
+    restart) stop; sleep 2; start ;;
+    *) echo "Usage: $0 {start|stop|status|restart}"; exit 1 ;;
 esac
 exit 0

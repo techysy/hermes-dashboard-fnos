@@ -11,5 +11,6 @@ distributor           = techysy
 distributor_url       = https://github.com/techysy/hermes-core-fnos
 desktop_uidir         = ui
 desktop_applaunchname = HermesDashboard.Application
+service_port          = 9118
 ctl_stop              = true
 checkport             = false
