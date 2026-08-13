@@ -1,8 +1,8 @@
 appname               = HermesDashboard
 version               = 1.0.0
 display_name          = Hermes Agent
-desc                  = Hermes Agent 的 Web 控制台快捷入口 — 打开即进入 Hermes Core 的 Web 控制台（需先安装并运行 Hermes Core）
-changelog             = 改名为 Hermes Agent；提供反向代理 (9118 -> 127.0.0.1:9119) 局域网免登录
+desc                  = Hermes Agent 的 Web 控制台快捷入口 — 打开即进入 Hermes Core 的 Web 控制台（需先安装并运行 Hermes Core，手动登录）
+changelog             = 显示名改为 Hermes Agent；纯空壳快捷入口，iframe 指向 :9119 dashboard（手动登录）
 arch                  = x86_64
 source                = thirdparty
 maintainer            = techysy
@@ -11,6 +11,5 @@ distributor           = techysy
 distributor_url       = https://github.com/techysy/hermes-core-fnos
 desktop_uidir         = ui
 desktop_applaunchname = HermesDashboard.Application
-service_port          = 9118
 ctl_stop              = true
 checkport             = false
