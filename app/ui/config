@@ -1,7 +1,7 @@
 {
     ".url": {
         "HermesDashboard.Application": {
-            "title": "Hermes Dashboard",
+            "title": "Hermes Agent",
             "icon": "images/icon_{0}.png",
             "type": "iframe",
             "protocol": "http",

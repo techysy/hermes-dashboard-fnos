@@ -1,4 +1,4 @@
-# Hermes Dashboard (fnOS)
+# Hermes Agent (fnOS)
 
 Hermes Core Dashboard 的**快捷入口空壳应用**，提供**反向代理**，局域网免登录访问 Hermes Core 的 Web 控制台。
 

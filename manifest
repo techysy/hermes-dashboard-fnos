@@ -1,8 +1,8 @@
 appname               = HermesDashboard
 version               = 1.0.0
-display_name          = Hermes Dashboard
-desc                  = Hermes Core 的 Dashboard 快捷入口 — 打开即进入 Hermes Core 的 Web 控制台（需先安装并运行 Hermes Core）
-changelog             = 首个版本：Hermes Core Dashboard 空壳快捷入口
+display_name          = Hermes Agent
+desc                  = Hermes Agent 的 Web 控制台快捷入口 — 打开即进入 Hermes Core 的 Web 控制台（需先安装并运行 Hermes Core）
+changelog             = 改名为 Hermes Agent；提供反向代理 (9118 -> 127.0.0.1:9119) 局域网免登录
 arch                  = x86_64
 source                = thirdparty
 maintainer            = techysy
