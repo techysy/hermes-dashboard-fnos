@@ -10,7 +10,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CUR_VER="$(cat "$ROOT/VERSION" 2>/dev/null | tr -d '[:space:]')"
 [ -z "$CUR_VER" ] && CUR_VER="1.0.0"
 FPK_DIR="/vol1/1000/fnOS App/fpk/HermesDashboard"
-OLDFPK_DIR="/vol1/1000/fnOS App/fpk/oldfpk"
+OLDFPK_DIR="/vol1/1000/fnOS App/old_fpk/HermesDashboard"
 
 MODE="${1:-}"
 if [ "$MODE" = "--formal" ]; then
