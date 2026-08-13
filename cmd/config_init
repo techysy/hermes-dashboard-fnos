@@ -1,3 +1,3 @@
 #!/bin/bash
-# HermesDashboard 空壳应用 — 无后端, 生命周期无需操作
+# Hermes Agent 空壳应用（appid=HermesAgent） — 无后端, 生命周期无需操作
 exit 0

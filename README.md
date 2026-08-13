@@ -6,7 +6,7 @@ Hermes Core Web 控制台的**快捷入口空壳应用**。
 
 ## 前置要求
 
-- 已安装并运行 [HermesCore](https://github.com/techysy/hermes-core-fnos)（dashboard 监听 :9119）
+- 已安装并运行 [HermesCore](https://github.com/techysy/hermes-core-fnos-v2)（dashboard 监听 :9119）
 
 ## 说明
 
@@ -19,7 +19,7 @@ Hermes Core Web 控制台的**快捷入口空壳应用**。
 
 ## 安装
 
-App Center → 手动安装 → 选择 `HermesDashboard.fpk`。
+App Center → 手动安装 → 选择 `HermesAgent.fpk`。
 
 ## License
 

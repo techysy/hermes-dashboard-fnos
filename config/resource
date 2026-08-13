@@ -4,10 +4,10 @@
         "shares":
         [
             {
-                "name": "HermesDashboard",
+                "name": "HermesAgent",
                 "permission":
                 {
-                    "rw": ["HermesDashboard"]
+                    "rw": ["HermesAgent"]
                 }
             }
         ]
