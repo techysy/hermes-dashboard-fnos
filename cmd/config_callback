@@ -1,3 +1,27 @@
 #!/bin/bash
-# Hermes Agent 空壳应用（appid=HermesAgent） — 无后端, 生命周期无需操作
+# config_callback — 保存 fnOS 应用设置页配置 (目标仪表盘 IP + 端口)
+# fnOS 设置页保存时运行. 字段为裸 env var (无 wizard_ 前缀, 与 install 向导不同).
+# 目标: 由 target_ip + target_port 写入 dashboard.conf; 留空保留当前值.
+set -uo pipefail
+
+APP_NAME="${TRIM_APPNAME:-HermesAgent}"
+DATA_DIR="${TRIM_PKGVAR:-/vol4/@appdata/${APP_NAME}}"
+LOG="${DATA_DIR}/config.log"
+CONF="${DATA_DIR}/dashboard.conf"
+
+mkdir -p "${DATA_DIR}" 2>/dev/null
+echo "[$(date '+%F %T')] config_callback start target_ip='${target_ip:-}' target_port='${target_port:-}'" >> "${LOG}"
+
+# 仅当 IP 填了才写 (端口缺省 9119; 两者留空则保留当前, 不置空)
+if [ -n "${target_ip:-}" ]; then
+    port="${target_port:-9119}"
+    printf 'TARGET_IP=%s\nTARGET_PORT=%s\n' "${target_ip}" "${port}" > "${CONF}" 2>/dev/null
+    chmod 600 "${CONF}" 2>/dev/null
+    chown "${APP_NAME:-HermesAgent}:${APP_NAME:-HermesAgent}" "${CONF}" 2>/dev/null || true
+    echo "[$(date '+%F %T')] updated dashboard.conf: ${target_ip}:${port}" >> "${LOG}"
+else
+    echo "[$(date '+%F %T')] target_ip empty; keep current dashboard.conf" >> "${LOG}"
+fi
+
+echo "[$(date '+%F %T')] config_callback done" >> "${LOG}"
 exit 0

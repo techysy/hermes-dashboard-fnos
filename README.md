@@ -1,21 +1,31 @@
 # Hermes Agent (fnOS)
 
-Hermes Core Web 控制台的**快捷入口空壳应用**。
+Agent Web 控制台的**快捷入口空壳应用**，可在安装向导 / 设置页指定**目标 IP 与端口**，打开任意 Agent 的仪表盘。
 
-打开即进入 Hermes Core 的 Web 控制台（`http://<NAS>:9119`），手动登录后使用。
+打开即进入配置的目标 Web 控制台（默认 Hermes Core `127.0.0.1:9119`），手动登录后使用。
+
+## ✨ 功能
+
+- **可配置目标**：安装向导 / fnOS 设置页填写「目标 IP / 域名 + 端口」
+  - 默认 `127.0.0.1:9119`（本机 Hermes Core）
+  - 可改为任意机器，如 `192.168.31.31:9119`（VM 上的 Agent）
+- **内置代理转发**：桌面图标通过本机 `:9120` 由内置代理转发到配置的目标（支持 HTTP / WebSocket）
+- 桌面 iframe 打开配置目标的 Web 控制台
 
 ## 前置要求
 
-- 已安装并运行 [HermesCore](https://github.com/techysy/hermes-core-fnos-v2)（dashboard 监听 :9119）
+- 目标 Agent 服务已运行（如 [HermesCore](https://github.com/techysy/hermes-core-fnos-v2) dashboard 监听 :9119）
+- 目标机器与 NAS 网络互通
 
-## 说明
+## 配置
 
-这是一个**纯空壳应用**：
+| 项 | 默认 | 说明 |
+|----|------|------|
+| 目标 IP | `127.0.0.1` | Agent 仪表盘地址（本机或其它机器） |
+| 目标端口 | `9119` | Agent 仪表盘端口 |
+| 本机入口 | `9120` | 桌面图标打开的本机端口（内置代理监听） |
 
-- 没有后端进程、不占用端口
-- 桌面图标通过 iframe 指向 Hermes Core 的 dashboard 端口 9119
-- 打开后**手动输入账号密码登录**（admin / 安装时设置的密码）
-- 生命周期脚本全部为 no-op
+> 配置保存到数据区 `dashboard.conf`。修改后重启应用生效。
 
 ## 安装
 

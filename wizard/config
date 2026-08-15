@@ -1,0 +1,27 @@
+[
+  {
+    "stepTitle": "目标仪表盘配置",
+    "items": [
+      {
+        "type": "text",
+        "field": "target_ip",
+        "label": "目标 IP / 域名",
+        "placeholder": "127.0.0.1",
+        "initValue": "",
+        "desc": "要打开的 Agent 仪表盘地址（如 Hermes Core 本机 127.0.0.1，或其它机器 192.168.31.31）。只填 IP 或域名，不要带 http://，端口单独填下一项。留空保留当前设置。"
+      },
+      {
+        "type": "text",
+        "field": "target_port",
+        "label": "目标端口",
+        "placeholder": "9119",
+        "initValue": "",
+        "desc": "Agent 仪表盘的端口号（纯数字，如 Hermes Core 9119）。不要带冒号。留空保留当前设置。"
+      },
+      {
+        "type": "tips",
+        "helpText": "配置写入数据区 dashboard.conf。留空保留当前设置，修改后重启应用生效。"
+      }
+    ]
+  }
+]
