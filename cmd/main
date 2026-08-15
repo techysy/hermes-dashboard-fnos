@@ -5,9 +5,27 @@ set -u
 
 APP_NAME="${TRIM_APPNAME:-HermesAgent}"
 APP_DIR="${TRIM_APPDEST:-/var/apps/${APP_NAME}}"
-# 数据目录: 优先 TRIM_PKGVAR (fnOS 注入); 兜底从 APP_DIR 提取卷推导, 不写死 /vol4
-APP_VOL="$(printf '%s' "${APP_DIR}" | sed -n 's#^\(/vol[^/]*\)/.*#\1#p')"
-DATA_DIR="${TRIM_PKGVAR:-${APP_VOL}/@appdata/${APP_NAME}}"
+# 数据目录: 优先 TRIM_PKGVAR (fnOS 注入). 兜底: 从 fnOS home 软链 (/volX/@apphome/<app>) 推导卷,
+# 或从 APP_DIR 推导; 不写死具体卷. (空壳应用 fnOS 可能不注入 TRIM_PKGVAR, 需此兜底)
+APP_VOL=""
+if [ -n "${TRIM_PKGVAR:-}" ]; then
+    DATA_DIR="${TRIM_PKGVAR}"
+else
+    # 从 home 软链推导卷 (fnOS 标准: /volX/@apphome/<app> -> /volX)
+    if [ -L "${APP_DIR}/home" ]; then
+        APP_HOME="$(readlink -f "${APP_DIR}/home")"
+        APP_VOL="$(printf '%s' "${APP_HOME}" | sed -n 's#^\(/vol[^/]*\)/.*#\1#p')"
+    fi
+    # 兜底: 从 APP_DIR 推导卷
+    if [ -z "${APP_VOL}" ]; then
+        APP_VOL="$(printf '%s' "${APP_DIR}" | sed -n 's#^\(/vol[^/]*\)/.*#\1#p')"
+    fi
+    if [ -n "${APP_VOL}" ]; then
+        DATA_DIR="${APP_VOL}/@appdata/${APP_NAME}"
+    else
+        DATA_DIR="${APP_DIR}/var"
+    fi
+fi
 # proxy 脚本与 cmd/main 同目录
 CMD_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROXY_PY="${CMD_DIR}/proxy.py"
