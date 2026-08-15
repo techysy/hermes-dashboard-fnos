@@ -19,6 +19,13 @@ PROXY_PID="${DATA_DIR}/proxy.pid"
 # 目标配置 (默认 127.0.0.1:9119, 经设置页改)
 CONF="${DATA_DIR}/dashboard.conf"
 
+# Python 运行时 (manifest install_dep_apps=python312): 优先 fnOS 标准软链, fallback 应用卷/系统
+PYTHON_BIN=""
+for cand in /var/apps/python312/target/bin/python3 "${APP_VOL}/@appcenter/python312/bin/python3" /usr/bin/python3; do
+    [ -x "$cand" ] && PYTHON_BIN="$cand" && break
+done
+[ -n "${PYTHON_BIN}" ] || PYTHON_BIN="python3"
+
 mkdir -p "${DATA_DIR}"
 
 read_target() {
@@ -41,9 +48,9 @@ start() {
     fi
     read -r t_ip t_port < <(read_target)
     HERMES_LISTEN_PORT="${LISTEN_PORT}" HERMES_CONF_DIR="${DATA_DIR}" \
-        nohup python3 "${PROXY_PY}" >> "${PROXY_LOG}" 2>&1 &
+        nohup "${PYTHON_BIN}" "${PROXY_PY}" >> "${PROXY_LOG}" 2>&1 &
     echo $! > "${PROXY_PID}"
-    echo "proxy started (pid $(cat "${PROXY_PID}")) listen :${LISTEN_PORT} -> ${t_ip}:${t_port}"
+    echo "proxy started (pid $(cat "${PROXY_PID}")) listen :${LISTEN_PORT} -> ${t_ip}:${t_port} (python: ${PYTHON_BIN})"
     sleep 1
 }
 
