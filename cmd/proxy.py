@@ -110,7 +110,9 @@ def _handle(conn):
         # 3. 连接后端
         backend_sock = socket.create_connection(backend, timeout=30)
         # 重写 Host 头为目标 (规避目标侧域名校验)
-        lines = head.split(b"\r\n")
+        # head 已含结尾 \r\n\r\n, 去掉后再按行处理, 避免重复空行导致 400
+        head_no_end = head[:-4]  # 去掉结尾的 \r\n\r\n
+        lines = head_no_end.split(b"\r\n")
         out_lines = []
         host_written = False
         for line in lines:
@@ -124,7 +126,7 @@ def _handle(conn):
                 out_lines.append(line)
         if not host_written:
             out_lines.append(f"Host: {backend[0]}:{backend[1]}".encode())
-        # 重新拼请求
+        # 重新拼请求 (头 + 单个 \r\n\r\n + body)
         request = b"\r\n".join(out_lines) + b"\r\n\r\n" + body
         backend_sock.sendall(request)
 
