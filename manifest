@@ -1,8 +1,8 @@
 appname               = HermesAgent
-version               = 1.2.1
+version               = 1.2.2
 display_name          = Hermes Agent
 desc                  = Hermes Agent 的 Web 控制台快捷入口 — 可在安装向导/设置页指定目标仪表盘的 IP 与端口（默认 Hermes Core :9119），由内置代理转发打开任意 Agent 的 Web 控制台
-changelog             = v1.2.0 增强：内置代理改用原生 socket，修复 WebSocket 透传 1006 断连（聊天/实时终端稳定）；安装向导/设置页可配置目标仪表盘 IP+端口
+changelog             = v1.2.2 修复：内置代理重写 Host 时去掉重复空行，修复 POST 400（登录/聊天 WS 1006）；原生 socket 实现，聊天/实时终端稳定
 platform              = all
 source                = thirdparty
 maintainer            = techysy
