@@ -10,7 +10,11 @@ Agent Web 控制台的**快捷入口空壳应用**，可在安装向导 / 设置
   - 默认 `127.0.0.1:9119`（本机 Hermes Core）
   - 可改为任意机器，如 `192.168.31.31:9119`（VM 上的 Agent）
 - **内置代理转发**：桌面图标通过本机 `:9120` 由内置代理转发到配置的目标（支持 HTTP / WebSocket）
+  - **原生 socket 实现**，WebSocket 升级后干净双向透传，不丢帧、不 1006 断连
+  - 适合聊天页 / 实时终端等依赖 WebSocket 的 Agent 控制台
 - 桌面 iframe 打开配置目标的 Web 控制台
+
+> 🔧 **WebSocket 透传技术说明**：见 [`docs/websocket-proxy.md`](docs/websocket-proxy.md)
 
 ## 前置要求
 
