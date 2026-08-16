@@ -15,12 +15,24 @@ mkdir -p "${DATA_DIR}" 2>/dev/null
 echo "[$(date '+%F %T')] install_callback start target_ip='${wizard_target_ip:-}' target_port='${wizard_target_port:-}'" >> "${LOG}"
 
 # 目标 IP: 默认 127.0.0.1; 端口: 默认 9119
-ip="${wizard_target_ip:-127.0.0.1}"
-port="${wizard_target_port:-9119}"
-printf 'TARGET_IP=%s\nTARGET_PORT=%s\n' "${ip}" "${port}" > "${CONF}" 2>/dev/null
-chmod 600 "${CONF}" 2>/dev/null
-chown "${APP_NAME:-HermesAgent}:${APP_NAME:-HermesAgent}" "${CONF}" 2>/dev/null || true
-echo "[$(date '+%F %T')] saved dashboard.conf: ${ip}:${port}" >> "${LOG}"
+ip="${wizard_target_ip:-}"
+port="${wizard_target_port:-}"
+# 若安装向导未填 IP (升级场景会复用 install_callback 但 wizard_target_ip 为空),
+# 且已有 dashboard.conf, 则保留当前配置, 不覆盖为用户之前设好的目标.
+if [ -n "${ip}" ]; then
+    [ -z "${port}" ] && port="9119"
+    printf 'TARGET_IP=%s\nTARGET_PORT=%s\n' "${ip}" "${port}" > "${CONF}" 2>/dev/null
+    chmod 600 "${CONF}" 2>/dev/null
+    chown "${APP_NAME:-HermesAgent}:${APP_NAME:-HermesAgent}" "${CONF}" 2>/dev/null || true
+    echo "[$(date '+%F %T')] saved dashboard.conf: ${ip}:${port}" >> "${LOG}"
+elif [ -f "${CONF}" ]; then
+    echo "[$(date '+%F %T')] wizard_target_ip empty, keep existing dashboard.conf" >> "${LOG}"
+else
+    # 全新安装且未填: 用默认
+    printf 'TARGET_IP=127.0.0.1\nTARGET_PORT=9119\n' > "${CONF}" 2>/dev/null
+    chmod 600 "${CONF}" 2>/dev/null
+    echo "[$(date '+%F %T')] saved default dashboard.conf: 127.0.0.1:9119" >> "${LOG}"
+fi
 
 echo "[$(date '+%F %T')] install_callback done" >> "${LOG}"
 exit 0
