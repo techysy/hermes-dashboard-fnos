@@ -70,19 +70,31 @@ def _relay(sock_a, sock_b):
         except Exception:
             pass
         finally:
+            # 关闭对端写 + 双方 socket, 避免 fd/连接泄漏 (长期运行 fd 耗尽会拒绝新连接)
             try:
                 dst.shutdown(socket.SHUT_WR)
+            except Exception:
+                pass
+            try:
+                src.close()
             except Exception:
                 pass
     t1 = threading.Thread(target=pump, args=(sock_a, sock_b), daemon=True)
     t2 = threading.Thread(target=pump, args=(sock_b, sock_a), daemon=True)
     t1.start(); t2.start()
     t1.join(); t2.join()
+    # 两个 pump 都结束 (连接已关闭), 确保双方 socket 关闭
+    for s in (sock_a, sock_b):
+        try:
+            s.close()
+        except Exception:
+            pass
 
 
 def _handle(conn):
     """处理单个客户端连接 (HTTP 或 WebSocket)."""
     backend = _load_target()
+    backend_sock = None
     try:
         conn.settimeout(30)
         # 1. 读取客户端请求头 (含请求行 + headers)
@@ -192,6 +204,11 @@ def _handle(conn):
             conn.close()
         except Exception:
             pass
+        if backend_sock:
+            try:
+                backend_sock.close()
+            except Exception:
+                pass
 
 
 def _relay_send(src, dst):
