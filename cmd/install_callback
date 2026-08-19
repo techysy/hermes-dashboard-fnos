@@ -35,4 +35,21 @@ else
 fi
 
 echo "[$(date '+%F %T')] install_callback done" >> "${LOG}"
+
+# 启动 proxy (fnOS App Center 对代理应用自动 start 有时不生效, 这里主动拉起, 保证装完即用)
+# cmd/main 实际位于 /var/apps/<app>/cmd/main (fnOS 把脚本放 /var/apps, APP_DIR 可能指向 @appcenter)
+MAIN_SCRIPT=""
+for cand in "/var/apps/${APP_NAME}/cmd/main" "${APP_DIR}/cmd/main" "${APP_DIR}/target/cmd/main"; do
+    [ -f "$cand" ] && MAIN_SCRIPT="$cand" && break
+done
+# 延迟后台启动, 避免阻塞 install 流程
+(
+    sleep 2
+    if [ -n "${MAIN_SCRIPT}" ]; then
+        bash "${MAIN_SCRIPT}" start >> "${LOG}" 2>&1
+    else
+        echo "[$(date '+%F %T')] ERROR: cmd/main not found" >> "${LOG}"
+    fi
+) &
+echo "[$(date '+%F %T')] proxy start triggered (main=${MAIN_SCRIPT})" >> "${LOG}"
 exit 0

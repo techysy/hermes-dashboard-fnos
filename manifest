@@ -13,4 +13,3 @@ desktop_uidir         = ui
 desktop_applaunchname = HermesAgent.Application
 service_port          = 9120
 ctl_stop              = true
-install_dep_apps      = python312
