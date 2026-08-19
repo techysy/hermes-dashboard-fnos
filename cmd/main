@@ -65,11 +65,30 @@ start() {
         return 0
     fi
     read -r t_ip t_port < <(read_target)
+    # 校验 proxy.py 存在
+    if [ ! -f "${PROXY_PY}" ]; then
+        echo "ERROR: proxy.py not found at ${PROXY_PY}" >&2
+        return 1
+    fi
     HERMES_LISTEN_PORT="${LISTEN_PORT}" HERMES_CONF_DIR="${DATA_DIR}" \
         nohup "${PYTHON_BIN}" "${PROXY_PY}" >> "${PROXY_LOG}" 2>&1 &
     echo $! > "${PROXY_PID}"
     echo "proxy started (pid $(cat "${PROXY_PID}")) listen :${LISTEN_PORT} -> ${t_ip}:${t_port} (python: ${PYTHON_BIN})"
-    sleep 1
+    sleep 2
+    # 健康检查: 进程存活 + 端口监听
+    if ! kill -0 "$(cat "${PROXY_PID}")" 2>/dev/null; then
+        echo "ERROR: proxy failed to start (check proxy.log)" >&2
+        rm -f "${PROXY_PID}"
+        return 1
+    fi
+    # 校验端口监听 (proxy 可能绑定失败)
+    if ! (command -v ss >/dev/null 2>&1 && ss -tln 2>/dev/null | grep -q ":${LISTEN_PORT} ") && \
+       ! (command -v netstat >/dev/null 2>&1 && netstat -tln 2>/dev/null | grep -q ":${LISTEN_PORT} "); then
+        echo "ERROR: proxy not listening on :${LISTEN_PORT}" >&2
+        return 1
+    fi
+    echo "proxy health OK (:${LISTEN_PORT})"
+    return 0
 }
 
 stop() {
