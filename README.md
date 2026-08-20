@@ -15,6 +15,7 @@ Agent Web 控制台的**快捷入口空壳应用**，可在安装向导 / 设置
 - 桌面 iframe 打开配置目标的 Web 控制台
 
 > 🔧 **WebSocket 透传技术说明**：见 [`docs/websocket-proxy.md`](docs/websocket-proxy.md)
+> 🛠️ **白屏健壮化修复（v1.2.4）**：见 [`docs/whitescreen-hardening-v1.2.4.md`](docs/whitescreen-hardening-v1.2.4.md)
 > 📋 **更新日志**：见 [CHANGELOG.md](CHANGELOG.md)
 > 🧪 **测试报告**：见 [docs/test-report.md](docs/test-report.md)
 
