@@ -1,4 +1,10 @@
 # Changelog — Hermes Agent (fnOS)
+# Changelog
+
+## [1.2.4] - 2026-08-20
+- **修复**: proxy.py 配置目录多级兜底（不依赖单一 HERMES_CONF_DIR env，自动从 fnOS 数据目录推导）
+- **修复**: cmd/main 启动时兜底创建 dashboard.conf
+
 
 Agent Web 控制台的**快捷入口空壳应用**。所有版本变更记录。
 
