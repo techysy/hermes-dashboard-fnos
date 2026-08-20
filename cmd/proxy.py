@@ -13,15 +13,55 @@ import threading
 
 
 LISTEN_PORT = int(os.environ.get("HERMES_LISTEN_PORT", "9120"))
-CONF_DIR = os.environ.get("HERMES_CONF_DIR", "/tmp/hermes")
+
+
+def _resolve_conf_dir():
+    """多级兜底定位 dashboard.conf 所在目录, 不依赖单一 env.
+
+    优先级:
+      1. HERMES_CONF_DIR env (显式指定)
+      2. TRIM_PKGVAR env (fnOS 注入的数据目录) → <data>/dashboard.conf
+      3. 常见 fnOS 数据目录 (/volX/@appdata/<App>)
+      4. 当前工作目录
+      5. 默认 /tmp/hermes (最后兜底)
+    """
+    app_name = os.environ.get("TRIM_APPNAME", "")
+    candidates = []
+    env_dir = os.environ.get("HERMES_CONF_DIR", "").strip()
+    if env_dir:
+        candidates.append(env_dir)
+    pkgvar = os.environ.get("TRIM_PKGVAR", "").strip()
+    if pkgvar:
+        candidates.append(pkgvar)
+    if app_name:
+        import glob
+        for vol in glob.glob("/vol*/@appdata/" + app_name):
+            candidates.append(vol)
+        candidates.append(f"/vol1/@appdata/{app_name}")
+        candidates.append(f"/vol4/@appdata/{app_name}")
+    candidates.append(os.getcwd())
+    candidates.append("/tmp/hermes")
+
+    for cand in candidates:
+        conf = os.path.join(cand, "dashboard.conf")
+        if os.path.isfile(conf):
+            return cand
+    # 无现有配置文件: 取第一个存在目录的候选, 让后续可写
+    for cand in candidates:
+        if cand and os.path.isdir(cand):
+            return cand
+    return "/tmp/hermes"
+
+
+CONF_DIR = _resolve_conf_dir()
+_CONF_FILE = os.path.join(CONF_DIR, "dashboard.conf")
 
 
 def _load_target():
     """从 dashboard.conf 读目标 IP:PORT, 默认 127.0.0.1:9119."""
     ip, port = "127.0.0.1", 9119
-    conf = os.path.join(CONF_DIR, "dashboard.conf")
     try:
-        with open(conf, encoding="utf-8") as f:
+        with open(_CONF_FILE, encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
                 if line.startswith("TARGET_IP="):
@@ -33,7 +73,10 @@ def _load_target():
                     if v.isdigit():
                         port = int(v)
     except OSError:
-        pass
+        print(
+            f"[proxy] WARN: cannot read config {_CONF_FILE}; using default 127.0.0.1:9119",
+            flush=True,
+        )
     return (ip, port)
 
 
@@ -238,7 +281,11 @@ def main():
     server.bind(("0.0.0.0", LISTEN_PORT))
     server.listen(128)
     ip, port = _load_target()
-    print(f"hermes agent proxy: 0.0.0.0:{LISTEN_PORT} -> {ip}:{port} (native socket)", flush=True)
+    print(
+        f"hermes agent proxy: 0.0.0.0:{LISTEN_PORT} -> {ip}:{port} "
+        f"(conf={_CONF_FILE}) (native socket)",
+        flush=True,
+    )
     while True:
         conn, _ = server.accept()
         threading.Thread(target=_handle, args=(conn,), daemon=True).start()

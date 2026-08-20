@@ -64,6 +64,12 @@ start() {
         echo "proxy already running (pid $(cat "${PROXY_PID}"))"
         return 0
     fi
+    # 确保数据目录存在 + 配置文件兜底 (缺省用本机默认, 避免读错/读不到配置)
+    mkdir -p "${DATA_DIR}" 2>/dev/null || true
+    if [ ! -f "${CONF}" ]; then
+        printf 'TARGET_IP=127.0.0.1\nTARGET_PORT=9119\n' > "${CONF}" 2>/dev/null || true
+        echo "created default dashboard.conf (127.0.0.1:9119)" 
+    fi
     read -r t_ip t_port < <(read_target)
     # 校验 proxy.py 存在
     if [ ! -f "${PROXY_PY}" ]; then
