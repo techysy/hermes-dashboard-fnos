@@ -1,5 +1,10 @@
 # Hermes Agent (fnOS)
 
+[![Release](https://img.shields.io/github/v/release/techysy/hermes-dashboard-fnos)](https://github.com/techysy/hermes-dashboard-fnos/releases)
+[![Platform](https://img.shields.io/badge/platform-all-blue)](https://github.com/techysy/hermes-dashboard-fnos)
+[![License](https://img.shields.io/github/license/techysy/hermes-dashboard-fnos)](LICENSE)
+[![Last Commit](https://img.shields.io/github/last-commit/techysy/hermes-dashboard-fnos)](https://github.com/techysy/hermes-dashboard-fnos/commits/main)
+
 Agent Web 控制台的**快捷入口空壳应用**，可在安装向导 / 设置页指定**目标 IP 与端口**，打开任意 Agent 的仪表盘。
 
 打开即进入配置的目标 Web 控制台（默认 Hermes Core `127.0.0.1:9119`），手动登录后使用。
@@ -16,8 +21,42 @@ Agent Web 控制台的**快捷入口空壳应用**，可在安装向导 / 设置
 
 > 🔧 **WebSocket 透传技术说明**：见 [`docs/websocket-proxy.md`](docs/websocket-proxy.md)
 > 🛠️ **白屏健壮化修复（v1.2.4）**：见 [`docs/whitescreen-hardening-v1.2.4.md`](docs/whitescreen-hardening-v1.2.4.md)
+> ⚠️ **自启失败排障（v1.2.4）**：见下方「踩坑记录」
 > 📋 **更新日志**：见 [CHANGELOG.md](CHANGELOG.md)
 > 🧪 **测试报告**：见 [docs/test-report.md](docs/test-report.md)
+
+## ⚠️ 踩坑记录
+
+### 自启失败：Address already in use（端口占用）
+
+**症状**：NAS 重启后应用状态 running，但 `:9120` 无法访问；`proxy.log` 报 `OSError: [Errno 98] Address already in use`
+
+**根因**：异常关机 / 重启时旧 proxy 进程残留（pid 文件丢失但进程还活着），appcenter 自启拉起新 proxy 时 bind 失败退出，而 appcenter 仍认为启动成功。
+
+**排查**：
+
+```bash
+# 看端口被谁占
+sudo ss -tlnp | grep 9120
+# 看 proxy.log 是否有 bind 失败
+grep -n "already in use" /vol4/@appdata/HermesAgent/proxy.log
+```
+
+**临时修复**：杀掉残留进程后重启应用
+
+```bash
+sudo pkill -f "HermesAgent/cmd/proxy.py"
+# 应用中心 → Hermes Agent → 重启
+```
+
+### 其他历史坑
+
+| 版本 | 坑 | 详见 |
+|------|-----|------|
+| v1.2.3 | WebSocket 长连接 fd 泄漏 → 长期运行拒绝新连接 | [CHANGELOG](CHANGELOG.md) |
+| v1.2.2 | POST 400（Host 头重复空行）→ 聊天页 WS 1006 | [CHANGELOG](CHANGELOG.md) |
+| v1.2.2 | 升级覆盖 dashboard.conf 用户配置 | [CHANGELOG](CHANGELOG.md) |
+| v1.2.0 | http.server 反代缓冲陷阱 → WS 1006 断连 | [websocket-proxy.md](docs/websocket-proxy.md) |
 
 ## 前置要求
 
