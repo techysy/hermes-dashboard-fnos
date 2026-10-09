@@ -1,6 +1,12 @@
 # Changelog — Hermes Agent (fnOS)
 # Changelog
 
+## [1.2.5] - 2026-10-09
+- **修复**: NAS 重启后开机自启被陈旧 pid 文件短路 — 旧版仅 `kill -0` 判活，重启后 pid 被无关进程复用即误判"proxy 已在运行"而跳过启动，:9120 无人监听、桌面窗口打不开。现校验 `/proc/<pid>/cmdline` 确属本应用 proxy.py 才认定在跑；陈旧/复用 pid 自动清理
+- **新增**: `start` 后端口健康轮询（最长 20s），进程活着但端口不通（僵尸态）自动杀掉重启，最多 3 轮；`stop` 只杀 cmdline 确认属于本应用的进程，防 pid 复用误杀
+- **修复**: proxy.py 绑定 :9120 带退避重试（应对异常重启残留进程短暂占端口，即 README 踩坑记录的 "Address already in use"），最终失败非 0 退出交给 cmd/main 重试，不再"进程存活但端口没绑"
+- **变更**: python3 探测扩展（兼容 python3/python312 包名与 PATH 查找）；`kill_proxy` 同时清理 pid 丢失的残留 proxy 进程
+
 ## [1.2.4] - 2026-08-20
 - **修复**: proxy.py 配置目录多级兜底（不依赖单一 HERMES_CONF_DIR env，自动从 fnOS 数据目录推导）
 - **修复**: cmd/main 启动时兜底创建 dashboard.conf

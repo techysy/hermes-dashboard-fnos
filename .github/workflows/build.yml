@@ -1,0 +1,79 @@
+name: Build HermesAgent fpk
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: '可选：打包完成后自动上传资产到的 Release tag (例如 v1.2.5; 留空则仅产出 Actions Artifacts)'
+        required: false
+        default: ''
+
+concurrency:
+  group: build-hermesagent-fpk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-fpk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 校验 manifest 必需字段
+        run: |
+          grep -qE '^appname[[:space:]]*=[[:space:]]*HermesAgent$' manifest \
+            || { echo "ERROR: manifest appname 必须为 HermesAgent"; exit 1; }
+          grep -qE '^platform[[:space:]]*=[[:space:]]*all$' manifest \
+            || { echo "ERROR: manifest platform 必须为 all (跨平台通用包)"; exit 1; }
+          grep -qE '^version[[:space:]]*=' manifest || { echo "ERROR: manifest 缺少 version"; exit 1; }
+          echo "manifest 校验通过:" && grep -E '^(appname|version|platform|service_port|desktop_applaunchname)' manifest
+
+      - name: 下载 fnpack (飞牛官方打包工具)
+        env:
+          FNPACK_VERSION: "1.2.1"
+        run: |
+          curl -fsSL -o /usr/local/bin/fnpack "https://static2.fnnas.com/fnpack/fnpack-${FNPACK_VERSION}-linux-amd64"
+          chmod +x /usr/local/bin/fnpack
+          fnpack --help | head -3
+
+      - name: 打包 HermesAgent.fpk
+        run: |
+          find . -type l -not -path './.git/*' -delete 2>/dev/null || true
+          chmod +x cmd/* scripts/*.sh 2>/dev/null || true
+          # 防止 CRLF 污染 NAS 端 shell 脚本
+          sed -i 's/\r$//' cmd/* manifest app/ui/config 2>/dev/null || true
+          rm -f HermesAgent.fpk
+          fnpack build -d .
+          [ -f HermesAgent.fpk ] || { echo "ERROR: fnpack build failed"; exit 1; }
+          VERSION="$(grep -E '^version[[:space:]]*=' manifest | head -1 | sed 's/.*=//;s/[[:space:]]//g')"
+          mv HermesAgent.fpk "HermesAgent-${VERSION}-all.fpk"
+          ls -lh "HermesAgent-${VERSION}-all.fpk"
+          echo "FPK_NAME=HermesAgent-${VERSION}-all.fpk" >> "$GITHUB_ENV"
+
+      - name: 上传 fpk 构件 (Actions Artifacts)
+        uses: actions/upload-artifact@v4
+        with:
+          name: hermesagent-fpk-${{ github.sha }}
+          path: HermesAgent-*.fpk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: 自动上传 Release 资产 (若输入了 release_tag)
+        if: inputs.release_tag != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.release_tag }}
+        run: |
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
+            || gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
+                 --title "Hermes Agent $TAG for fnOS" \
+                 --generate-notes
+          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber "${{ env.FPK_NAME }}"
+          echo "## 📦 已上传 Release 资产 → \`$TAG\` (${{ env.FPK_NAME }})" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 构建完成 Summary
+        run: |
+          echo "## ✅ HermesAgent fpk 打包完成" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 文件: \`${{ env.FPK_NAME }}\` (\`platform = all\` x86_64/ARM64 通用)" >> "$GITHUB_STEP_SUMMARY"

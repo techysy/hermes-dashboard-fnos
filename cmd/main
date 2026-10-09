@@ -1,6 +1,12 @@
 #!/bin/bash
 # Hermes Agent — 空壳应用 + 目标仪表盘代理
 # 通过配置目标 IP:端口, 由 proxy.py 把桌面 iframe (本机固定端口) 转发到目标 agent 仪表盘.
+#
+# 重启健壮性 (v1.2.5): NAS 重启后 pid 文件残留, 且 pid 号可能被无关进程复用.
+# 旧版只用 kill -0 判活 → 误判"proxy 已在运行" → 开机自启被短路 →
+# :9120 无监听 → 桌面窗口打不开 (连接被拒).
+# 现在校验 /proc/<pid>/cmdline 确属本应用 proxy.py 后才认定在跑,
+# 并在启动后轮询端口健康检查, 失败自动清理重试 (含残留进程占用端口的自愈).
 set -u
 
 APP_NAME="${TRIM_APPNAME:-HermesAgent}"
@@ -39,9 +45,19 @@ CONF="${DATA_DIR}/dashboard.conf"
 
 # Python 运行时 (manifest install_dep_apps=python312): 优先 fnOS 标准软链, fallback 应用卷/系统
 PYTHON_BIN=""
-for cand in /var/apps/python312/target/bin/python3 "${APP_VOL}/@appcenter/python312/bin/python3" /usr/bin/python3; do
+for cand in /var/apps/python312/target/bin/python3 \
+            /var/apps/python3/target/bin/python3 \
+            "${APP_VOL}/@appcenter/python312/bin/python3" \
+            "${APP_VOL}/@appcenter/python3/bin/python3" \
+            /usr/bin/python3 /usr/local/bin/python3 /bin/python3; do
     [ -x "$cand" ] && PYTHON_BIN="$cand" && break
 done
+if [ -z "${PYTHON_BIN}" ]; then
+    for name in python3 python3.13 python3.12 python3.11 python3.10 python3.9; do
+        cand="$(command -v "$name" 2>/dev/null || true)"
+        [ -n "$cand" ] && [ -x "$cand" ] && PYTHON_BIN="$cand" && break
+    done
+fi
 [ -n "${PYTHON_BIN}" ] || PYTHON_BIN="python3"
 
 mkdir -p "${DATA_DIR}"
@@ -59,16 +75,76 @@ read_target() {
     echo "${ip} ${port}"
 }
 
-start() {
-    if [ -f "${PROXY_PID}" ] && kill -0 "$(cat "${PROXY_PID}")" 2>/dev/null; then
-        echo "proxy already running (pid $(cat "${PROXY_PID}"))"
-        return 0
+# ── 进程身份校验 ──
+# pid_cmdline_has <pid> <pattern>: 进程存活且命令行含 pattern.
+# 防 pid 复用误判 (重启后陈旧 pid 文件指向无关进程).
+pid_cmdline_has() {
+    local pid="$1" pat="$2"
+    [ -n "${pid}" ] || return 1
+    kill -0 "${pid}" 2>/dev/null || return 1
+    if [ -r "/proc/${pid}/cmdline" ]; then
+        tr '\0' ' ' < "/proc/${pid}/cmdline" 2>/dev/null | grep -q -- "${pat}" && return 0
+        return 1
     fi
+    ps -p "${pid}" -o args= 2>/dev/null | grep -q -- "${pat}"
+}
+
+proxy_running() {
+    [ -f "${PROXY_PID}" ] || return 1
+    pid_cmdline_has "$(cat "${PROXY_PID}" 2>/dev/null)" "proxy.py"
+}
+
+# TCP 回环端口可连通 (0.0.0.0 监听时回环必可达)
+port_alive() {
+    bash -c "exec 3<>/dev/tcp/127.0.0.1/${LISTEN_PORT}" 2>/dev/null
+}
+
+proxy_healthy() {
+    proxy_running && port_alive
+}
+
+launch_proxy() {
+    HERMES_LISTEN_PORT="${LISTEN_PORT}" HERMES_CONF_DIR="${DATA_DIR}" \
+        nohup "${PYTHON_BIN}" "${PROXY_PY}" >> "${PROXY_LOG}" 2>&1 &
+    echo $! > "${PROXY_PID}"
+}
+
+kill_proxy() {
+    if [ -f "${PROXY_PID}" ]; then
+        # 只杀确认属于本应用的进程, 防 pid 复用误杀无关进程
+        if pid_cmdline_has "$(cat "${PROXY_PID}" 2>/dev/null)" "proxy.py"; then
+            kill "$(cat "${PROXY_PID}")" 2>/dev/null || true
+        fi
+        rm -f "${PROXY_PID}"
+    fi
+    # 清理 pid 文件丢失但仍在占用端口的残留 proxy (README 踩坑: Address already in use)
+    pkill -f "${PROXY_PY}" 2>/dev/null || true
+}
+
+start() {
+    # 陈旧 pid 文件清理: pid 存在但不是本应用 proxy (重启后 pid 被复用) → 删除重来
+    if [ -f "${PROXY_PID}" ] && ! proxy_running; then
+        echo "removing stale pid file (pid $(cat "${PROXY_PID}" 2>/dev/null) is not our proxy)"
+        rm -f "${PROXY_PID}"
+    fi
+
+    if proxy_running; then
+        # 进程在但端口不通 (僵尸态) → 杀掉重启自愈
+        if proxy_healthy; then
+            echo "proxy already running (pid $(cat "${PROXY_PID}"))"
+            return 0
+        fi
+        echo "WARN: proxy alive but :${LISTEN_PORT} not reachable, restarting..."
+        kill_proxy
+        sleep 1
+    fi
+
     # 确保数据目录存在 + 配置文件兜底 (缺省用本机默认, 避免读错/读不到配置)
     mkdir -p "${DATA_DIR}" 2>/dev/null || true
     if [ ! -f "${CONF}" ]; then
         printf 'TARGET_IP=127.0.0.1\nTARGET_PORT=9119\n' > "${CONF}" 2>/dev/null || true
-        echo "created default dashboard.conf (127.0.0.1:9119)" 
+        chmod 600 "${CONF}" 2>/dev/null || true
+        echo "created default dashboard.conf (127.0.0.1:9119)"
     fi
     read -r t_ip t_port < <(read_target)
     # 校验 proxy.py 存在
@@ -76,41 +152,51 @@ start() {
         echo "ERROR: proxy.py not found at ${PROXY_PY}" >&2
         return 1
     fi
-    HERMES_LISTEN_PORT="${LISTEN_PORT}" HERMES_CONF_DIR="${DATA_DIR}" \
-        nohup "${PYTHON_BIN}" "${PROXY_PY}" >> "${PROXY_LOG}" 2>&1 &
-    echo $! > "${PROXY_PID}"
-    echo "proxy started (pid $(cat "${PROXY_PID}")) listen :${LISTEN_PORT} -> ${t_ip}:${t_port} (python: ${PYTHON_BIN})"
-    sleep 2
-    # 健康检查: 进程存活 + 端口监听
-    if ! kill -0 "$(cat "${PROXY_PID}")" 2>/dev/null; then
-        echo "ERROR: proxy failed to start (check proxy.log)" >&2
-        rm -f "${PROXY_PID}"
-        return 1
-    fi
-    # 校验端口监听 (proxy 可能绑定失败)
-    if ! (command -v ss >/dev/null 2>&1 && ss -tln 2>/dev/null | grep -q ":${LISTEN_PORT} ") && \
-       ! (command -v netstat >/dev/null 2>&1 && netstat -tln 2>/dev/null | grep -q ":${LISTEN_PORT} "); then
-        echo "ERROR: proxy not listening on :${LISTEN_PORT}" >&2
-        return 1
-    fi
-    echo "proxy health OK (:${LISTEN_PORT})"
-    return 0
+
+    # 启动 + 健康检查, 失败自动重试 (开机时卷/依赖应用尚未就绪的容错;
+    # 端口被残留进程占用时 kill_proxy 的 pkill 会清掉, 下一轮即可绑定)
+    # proxy.py 内部对端口绑定自带退避重试, 这里轮询等待而不是固定 sleep,
+    # 避免误杀"正在退避重试绑定"的健康进程
+    local attempt=1 max_attempt=3 waited
+    while [ "${attempt}" -le "${max_attempt}" ]; do
+        launch_proxy
+        echo "proxy started (pid $(cat "${PROXY_PID}")) listen :${LISTEN_PORT} -> ${t_ip}:${t_port} (python: ${PYTHON_BIN}) (attempt ${attempt}/${max_attempt})"
+        waited=0
+        while [ "${waited}" -lt 20 ]; do
+            sleep 1
+            waited=$((waited + 1))
+            if ! proxy_running; then
+                break   # 进程已退出 (如端口绑定最终失败), 立即重试
+            fi
+            if port_alive; then
+                echo "proxy health OK (:${LISTEN_PORT}, ${waited}s)"
+                return 0
+            fi
+        done
+        echo "WARN: proxy health check failed after ${waited}s (attempt ${attempt}/${max_attempt}), retrying..." >&2
+        kill_proxy
+        attempt=$((attempt + 1))
+        [ "${attempt}" -le "${max_attempt}" ] && sleep $((attempt * 2))
+    done
+
+    echo "ERROR: proxy failed to start after ${max_attempt} attempts (check ${PROXY_LOG})" >&2
+    return 1
 }
 
 stop() {
-    if [ -f "${PROXY_PID}" ]; then
-        kill "$(cat "${PROXY_PID}")" 2>/dev/null || true
-        rm -f "${PROXY_PID}"
-    fi
-    pkill -f "${PROXY_PY}" 2>/dev/null || true
+    kill_proxy
     echo "proxy stopped"
 }
 
 status() {
-    if [ -f "${PROXY_PID}" ] && kill -0 "$(cat "${PROXY_PID}")" 2>/dev/null; then
+    if proxy_running; then
         read -r t_ip t_port < <(read_target)
-        echo "running (pid $(cat "${PROXY_PID}")) listen :${LISTEN_PORT} -> ${t_ip}:${t_port}"
-        return 0
+        if port_alive; then
+            echo "running (pid $(cat "${PROXY_PID}")) listen :${LISTEN_PORT} -> ${t_ip}:${t_port}"
+            return 0
+        fi
+        echo "degraded (pid $(cat "${PROXY_PID}") alive but :${LISTEN_PORT} not listening)"
+        return 1
     fi
     echo "stopped"
     return 1

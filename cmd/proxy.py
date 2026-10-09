@@ -275,11 +275,30 @@ def _relay_send(src, dst):
             pass
 
 
+def _bind_listen():
+    """绑定监听端口; 开机阶段端口可能被异常重启残留的旧 proxy 短暂占用, 带退避重试.
+    最终绑定失败视为致命错误非 0 退出, 交给 cmd/main 的健康检查重启重试,
+    避免"进程活着但端口没绑"的僵尸状态骗过 pid 判活."""
+    import time
+    last_err = None
+    for attempt in range(4):
+        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            server.bind(("0.0.0.0", LISTEN_PORT))
+            server.listen(128)
+            return server
+        except OSError as e:
+            last_err = e
+            server.close()
+            print(f"[proxy] bind :{LISTEN_PORT} failed (attempt {attempt + 1}/4): {e}", flush=True)
+            time.sleep(1 + attempt)
+    print(f"[proxy] FATAL: cannot bind :{LISTEN_PORT}: {last_err}", flush=True)
+    raise SystemExit(1)
+
+
 def main():
-    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    server.bind(("0.0.0.0", LISTEN_PORT))
-    server.listen(128)
+    server = _bind_listen()
     ip, port = _load_target()
     print(
         f"hermes agent proxy: 0.0.0.0:{LISTEN_PORT} -> {ip}:{port} "

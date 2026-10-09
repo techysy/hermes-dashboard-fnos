@@ -27,11 +27,13 @@ Agent Web 控制台的**快捷入口空壳应用**，可在安装向导 / 设置
 
 ## ⚠️ 踩坑记录
 
-### 自启失败：Address already in use（端口占用）
+### 自启失败：Address already in use（端口占用）— v1.2.5 已根治
+
+> **v1.2.5 起自动修复**：`cmd/main` 启动改为校验进程 cmdline 身份 + 端口健康轮询 + 失败自动清理重试（含被残留进程占用端口时的 `pkill` 清理），`proxy.py` 绑定带退避重试且失败即退出交给外层重试。升级 fpk 后重启 NAS 即可，无需手动干预。以下为旧版（≤v1.2.4）手动排障记录：
 
 **症状**：NAS 重启后应用状态 running，但 `:9120` 无法访问；`proxy.log` 报 `OSError: [Errno 98] Address already in use`
 
-**根因**：异常关机 / 重启时旧 proxy 进程残留（pid 文件丢失但进程还活着），appcenter 自启拉起新 proxy 时 bind 失败退出，而 appcenter 仍认为启动成功。
+**根因**：异常关机 / 重启时旧 proxy 进程残留（pid 文件丢失但进程还活着），appcenter 自启拉起新 proxy 时 bind 失败退出，而 appcenter 仍认为启动成功。另一变体：重启后 pid 文件残留且 pid 号被无关进程复用，旧版 `kill -0` 误判"已在运行"直接跳过启动，同样导致 `:9120` 无人监听。
 
 **排查**：
 
@@ -53,6 +55,7 @@ sudo pkill -f "HermesAgent/cmd/proxy.py"
 
 | 版本 | 坑 | 详见 |
 |------|-----|------|
+| v1.2.5 | 重启后陈旧 pid 被复用 → 开机自启短路（已根治） | [CHANGELOG](CHANGELOG.md) |
 | v1.2.3 | WebSocket 长连接 fd 泄漏 → 长期运行拒绝新连接 | [CHANGELOG](CHANGELOG.md) |
 | v1.2.2 | POST 400（Host 头重复空行）→ 聊天页 WS 1006 | [CHANGELOG](CHANGELOG.md) |
 | v1.2.2 | 升级覆盖 dashboard.conf 用户配置 | [CHANGELOG](CHANGELOG.md) |
