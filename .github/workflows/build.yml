@@ -66,10 +66,22 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ inputs.release_tag }}
         run: |
+          # Release 正文取 CHANGELOG.md 中匹配该 tag 版本的章节, 避免 --generate-notes
+          # 在 tag 无 message 时产出空正文 (v1.2.5 曾因此只剩 Full Changelog 一行)
+          VERSION="${TAG#v}"
+          NOTES="$(awk -v ver="$VERSION" '
+            index($0, "## [" ver "]") == 1 {grab=1; print; next}
+            grab && /^## / {exit}
+            grab {print}
+          ' CHANGELOG.md)"
+          if [ -z "$NOTES" ]; then
+            NOTES="Hermes Agent $TAG for fnOS"
+            echo "WARN: CHANGELOG.md 未找到 [$VERSION] 章节, 使用兜底标题"
+          fi
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
             || gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
                  --title "Hermes Agent $TAG for fnOS" \
-                 --generate-notes
+                 --notes "$NOTES"
           gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber "${{ env.FPK_NAME }}"
           echo "## 📦 已上传 Release 资产 → \`$TAG\` (${{ env.FPK_NAME }})" >> "$GITHUB_STEP_SUMMARY"
 
