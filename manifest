@@ -1,8 +1,8 @@
 appname               = HermesAgent
-version               = 1.2.5
+version               = 1.2.6
 display_name          = Hermes Agent
 desc                  = Hermes Agent 的 Web 控制台快捷入口 — 可在安装向导/设置页指定目标仪表盘的 IP 与端口（默认 Hermes Core :9119），由内置代理转发打开任意 Agent 的 Web 控制台
-changelog             = v1.2.5 修复：NAS 重启后开机自启被陈旧 pid 文件短路（pid 复用误判"已在运行"）— 现校验进程 cmdline 身份 + 端口健康轮询 + 失败自动清理重试自愈；proxy 绑定端口带退避重试且失败即退出
+changelog             = v1.2.6 修复：应用中心"重启"后服务被误杀 — cmd/main 末尾恒 exit 0 掩盖 status 退出码, fnOS 状态机误判后清掉刚拉起的 proxy; 现透传真实退出码
 platform              = all
 source                = thirdparty
 maintainer            = techysy
